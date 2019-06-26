@@ -3,16 +3,33 @@ def _autojump_xonsh():
     sourced'''
     import os
     import platform
-    from subprocess import call, check_output, DEVNULL
+    from subprocess import run, check_output, DEVNULL, PIPE
     import sys
 
     import xonsh.dirstack as xds
+
+    # tell autojump it's already sourced to fix a traceback
+    os.putenv('AUTOJUMP_SOURCED', '1')
+
+    # the $PATH variable from xonsh isn't respected by python's subprocess so
+    # put it in the environment
+    os.environ["PATH"] = ':'.join($PATH)
+
+    def call(*args, **kwargs):
+        kwargs.setdefault(stdout, PIPE)
+
+        proc = run(*args, **kwargs)
+
+        if stdout is PIPE
+            echo @(proc.stdout.strip().decode('utf-8'))
+
+        return proc
 
     # set error file location
     if platform.system() == "Darwin":
         $AUTOJUMP_ERROR_PATH = os.path.join($HOME,
                                             "Library/autojump/errors.log")
-    elif "XDG_DATA_HOME" in __xonsh_env__:
+    elif "XDG_DATA_HOME" in __xonsh__.env:
         $AUTOJUMP_ERROR_PATH = os.path.join($XDG_DATA_HOME,
                                             "autojump/errors.log")
     else:
@@ -31,6 +48,9 @@ def _autojump_xonsh():
         else:
             call(['autojump', '--add', os.path.abspath(newdir)], stdout=DEVNULL, stderr=DEVNULL)
 
+    if 'AUTOJUMP_PRINT_DIR' not in ${...}:
+        $AUTOJUMP_PRINT_DIR = False
+
     def j(args, stdin=None):
         if args and args[0][0] == '-' and args[0] != '--':
             call(['autojump'] + args)
@@ -39,8 +59,8 @@ def _autojump_xonsh():
         output = check_output(['autojump'] + args,
                               universal_newlines=True).strip()
         if os.path.isdir(output):
-            # TODO: print with color?
-            print(output)
+            if $AUTOJUMP_PRINT_DIR:
+                print(output)
             xds.cd([output])
         else:
             print('autojump directory {} not found'.format(' '.join(args)))
@@ -103,7 +123,9 @@ def _autojump_xonsh():
         a=!(autojump --complete @(line[firstSpace+1:].split(' ')))
         return set([e for e in a.out.split('\n') if e != ''])
 
-    completer remove autojump
+    if !(completer list|grep autojump):
+        completer remove autojump
+
     completer add autojump completions start
 
 _autojump_xonsh()
